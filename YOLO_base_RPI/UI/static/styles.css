@@ -1,0 +1,44 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f8f9fa;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+}
+
+h1 {
+    color: #343a40;
+}
+
+.video-container {
+    position: relative;
+    width: 80%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 20px; /* Примерный отступ сверху */
+}
+
+img {
+    border: 2px solid #343a40;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    width: 100%; /* Изменено на 100% для заполнения контейнера */
+    max-width: 1000px; /* Установленная максимальная ширина изображения */
+    height: auto; /* Автоматический расчет высоты для сохранения пропорций */
+}
+
+
+#overlay-box {
+    position: absolute;
+    width: 50px; /* Adjust box size as needed */
+    height: 50px;
+    background-color: rgba(0, 0, 255, 0.3); /* Semi-transparent blue */
+    border: 2px solid #007bff; /* Border color */
+    box-sizing: border-box;
+    display: none; /* Initially hidden */
+}
+

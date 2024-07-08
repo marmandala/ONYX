@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Video Stream</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <h1>Video Stream</h1>
+    <div class="video-container">
+        <img id="video" src="{{ url_for('video_feed') }}" onclick="getClickCoords(event)">
+        <div id="overlay-box"></div> <!-- This will be the overlay box -->
+    </div>
+    <script>
+        let updateBoxTimer;
+        let originalWidth, originalHeight, displayedWidth, displayedHeight;
+
+        function getClickCoords(event) {
+            var img = document.getElementById("video");
+            var rect = img.getBoundingClientRect();
+            var x = event.clientX - rect.left;
+            var y = event.clientY - rect.top;
+
+            console.log(`Clicked coordinates (relative to image): (${x}, ${y})`);
+
+            var scaledX = Math.round(x * (originalWidth / displayedWidth));
+            var scaledY = Math.round(y * (originalHeight / displayedHeight));
+
+            console.log(`Scaled coordinates (relative to original image): (${scaledX}, ${scaledY})`);
+
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", "/publish_coordinates", true);
+            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+            xhr.send("coordinates=" + scaledX + "," + scaledY);
+        }
+
+        // Function to update the blue box position based on received coordinates
+        function updateBoxPosition(x, y) {
+            var img = document.getElementById("video");
+            
+            var box = document.getElementById("overlay-box");
+
+            // Scale coordinates from original image size to displayed image size
+            var scaledX = x * (displayedWidth / originalWidth);
+            var scaledY = y * (displayedHeight / originalHeight);
+
+            box.style.left = scaledX + "px";
+            box.style.top = scaledY + "px";
+            console.log(`Scaled box coordinates: (${scaledX}, ${scaledY})`);
+            box.style.display = "block";
+        }
+
+        // Function to hide the blue box
+        function hideBox() {
+            var box = document.getElementById("overlay-box");
+            box.style.display = "none";
+        }
+
+        // Function to fetch box coordinates and update the blue box position
+        function fetchBoxCoordinates() {
+            fetch('/get_box_coords')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.x && data.y) {
+                        updateBoxPosition(data.x, data.y);
+                    } else {
+                        hideBox();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching box coordinates:', error);
+                    hideBox();
+                });
+        }
+
+        // Function to start the update timer
+        function startUpdateTimer() {
+            updateBoxTimer = setInterval(fetchBoxCoordinates, 100); // Update every second
+        }
+
+        // Function to stop the update timer
+        function stopUpdateTimer() {
+            clearInterval(updateBoxTimer);
+        }
+
+        // Start the update timer when the page loads
+        window.onload = function() {
+            var img = document.getElementById("video");
+            originalWidth = img.naturalWidth; // Original dimensions of the image
+            originalHeight = img.naturalHeight;
+            displayedWidth = img.clientWidth; // Displayed dimensions of the image
+            displayedHeight = img.clientHeight;
+            
+            startUpdateTimer();
+        }
+
+        // Stop the update timer when the page unloads
+        window.onunload = function() {
+            stopUpdateTimer();
+        }
+    </script>
+</body>
+</html>
+
