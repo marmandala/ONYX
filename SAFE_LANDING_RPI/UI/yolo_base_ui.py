@@ -1,7 +1,9 @@
-from flask import Flask, render_template, Response, request
+from flask import Flask, render_template, Response, request, send_file
 import cv2
 import requests
 import numpy as np
+from flask import jsonify
+import io
 
 app = Flask(__name__)
 
@@ -16,18 +18,50 @@ def index():
 def video_feed():
     return Response(get_frame(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
-@app.route('/upload_mask', methods=['POST'])
+@app.route('/upload_mask', methods=['POST', 'GET'])
 def upload_mask():
     global mask
-    if 'mask' not in request.files:
-        return "No mask file", 400
+    if request.method == 'POST':
+        if 'mask' not in request.files:
+            return "No mask file", 400
 
-    mask_file = request.files['mask']
-    npimg = np.frombuffer(mask_file.read(), np.uint8)
-    mask = cv2.imdecode(npimg, cv2.IMREAD_GRAYSCALE)
-    # Преобразование маски в двоичное изображение (0 или 255)
-    _, mask = cv2.threshold(mask, 128, 255, cv2.THRESH_BINARY)
-    return "Mask uploaded", 200
+        mask_file = request.files['mask']
+        npimg = np.frombuffer(mask_file.read(), np.uint8)
+        mask = cv2.imdecode(npimg, cv2.IMREAD_GRAYSCALE)
+        # Преобразование маски в двоичное изображение (0 или 255)
+        _, mask = cv2.threshold(mask, 128, 255, cv2.THRESH_BINARY)
+        return "Mask uploaded", 200
+    
+    elif request.method == 'GET':
+        if mask is None:
+            return "No mask uploaded", 404
+        # Convert the mask to a format suitable for sending as an image response
+        _, buffer = cv2.imencode('.png', mask)
+        mask_bytes = buffer.tobytes()
+        return send_file(io.BytesIO(mask_bytes), mimetype='image/png', as_attachment=True, download_name='mask.png')
+
+@app.route('/post_pid_results', methods=['POST'])
+def post_pid_results():
+    global received_data
+    try:
+        data = request.json
+        x = data.get('x')
+        y = data.get('y')
+        
+        received_data = {'x': x, 'y': y}
+        
+        return 'Data received successfully', 200
+    
+    except Exception as e:
+        return f'Error: {e}', 500
+
+@app.route('/get_pid_results', methods=['GET'])
+def get_pid_results():
+    global received_data
+    if received_data:
+        return jsonify(received_data), 200
+    else:
+        return 'No data available', 404
 
 def get_frame():
     stream_url = "http://192.168.10.132:8080/stream?topic=/main_camera/image_raw"
@@ -66,15 +100,6 @@ def get_frame():
                         img_with_green = cv2.addWeighted(img, 1.0, green_part, 0.5, 0)
                         img_with_red = cv2.addWeighted(img, 1.0, red_part, 0.5, 0)
                         img = cv2.addWeighted(img_with_green, 0.5, img_with_red, 0.5, 0)
-                        
-                        # Display the masks using cv2.imshow
-                        # cv2.imshow('red_part', red_part)
-                        # cv2.imshow('green_part', green_part)
-                        # cv2.imshow('img_with_red', img_with_red)
-                        # cv2.imshow('img_with_green', img_with_green)
-                        # cv2.imshow('Inverse Mask', cv2.bitwise_not(resized_mask))
-                        # cv2.imshow('Mask', resized_mask)
-                        # cv2.waitKey(1)
 
                     _, buffer = cv2.imencode('.jpg', img)
                     frame = buffer.tobytes()
