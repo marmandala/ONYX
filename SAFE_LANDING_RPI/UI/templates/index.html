@@ -9,7 +9,10 @@
     <h1>YOLO Video Stream</h1>
     <div class="video-container">
         <img id="video" src="{{ url_for('video_feed') }}">
+        <div id="overlay-box"></div>
     </div>
+    <button onclick="safeLanding()">Safe Landing</button>
+    <script src="{{ url_for('static', filename='scripts.js') }}"></script>
 </body>
 </html>
 

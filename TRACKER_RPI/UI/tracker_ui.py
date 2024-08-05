@@ -39,16 +39,16 @@ def index():
 def video_feed():
     return Response(get_frame(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
-@app.route('/publish_coordinates', methods=['POST'])
-def publish_coordinates():
+@app.route('/box_coords', methods=['POST'])
+def box_coords():
     global last_coordinates
     coordinates = request.form.get('coordinates')
     print(f'Published coordinates: {coordinates}')
     last_coordinates = coordinates
     return '', 204
 
-@app.route('/publish_coordinates', methods=['GET'])
-def get_coordinates():
+@app.route('/box_coords', methods=['GET'])
+def get_box_coords():
     if last_coordinates is not None:
         x, y = last_coordinates.split(',')
         return jsonify({'x': int(x), 'y': int(y)})
@@ -80,30 +80,6 @@ def get_pid_results():
         return jsonify(received_data), 200
     else:
         return 'No data available', 404
-        
-@app.route('/box_coords', methods=['POST'])
-def box_coords():
-    global box_coordinates
-    try:
-        data = request.json
-        x = data.get('x')
-        y = data.get('y')
-        
-        box_coordinates = {'x': x, 'y': y}
-        
-        print(f'Received box coordinates: {box_coordinates}')
-        return 'Data received successfully', 200
-    
-    except Exception as e:
-        return f'Error: {e}', 500
-
-@app.route('/get_box_coords', methods=['GET'])
-def get_box_coords():
-    global box_coordinates
-    if box_coordinates:
-        return jsonify(box_coordinates), 200
-    else:
-        return jsonify({'error': 'No coordinates available'}), 404
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", debug=True)

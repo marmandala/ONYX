@@ -32,10 +32,11 @@ def visualize_landing_zone(mask, landing_point, circle_diameter):
     output_image = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
     if landing_point is not None:
         cv2.circle(output_image, landing_point, circle_diameter // 2, (0, 255, 0), 2)
-    cv2.imshow('Landing Zone', output_image)
+    # cv2.imshow('Landing Zone', output_image)
+    # cv2.waitKey(0)
     
-    if cv2.waitKey(0) & 0xFF == ord('q'):
-        cv2.destroyAllWindows()
+    # if 0xFF == ord('q'):
+        # cv2.destroyAllWindows()
 
 # Пример использования
 ip_address = 'http://192.168.10.132:5000/upload_mask'
@@ -44,15 +45,20 @@ circle_diameter = 50
 # Загрузка маски с IP-адреса
 mask = load_image_from_url(ip_address)
 
-# Поиск зоны посадки
-landing_point = find_landing_zone(mask, circle_diameter)
+def recognize_landing_point():
+    circle_diameter = 50
+    mask = load_image_from_url(ip_address)
+    
+    landing_point = find_landing_zone(mask, circle_diameter)
+    visualize_landing_zone(mask, landing_point, circle_diameter)
+    return landing_point
 
 # Визуализация
-visualize_landing_zone(mask, landing_point, circle_diameter)
+# visualize_landing_zone(mask, landing_point, circle_diameter)
 
-if landing_point:
-    print(f"Координаты безопасной зоны посадки: {landing_point}")
-    compute_track_and_pid.track_point(landing_point)
-else:
-    print("Безопасная зона для посадки не найдена.")
+# if landing_point:
+    # print(f"Координаты безопасной зоны посадки: {landing_point}")
+    # compute_track_and_pid.track_point(landing_point)
+# else:
+    # print("Безопасная зона для посадки не найдена.")
 

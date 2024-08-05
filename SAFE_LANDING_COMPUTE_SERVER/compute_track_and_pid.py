@@ -14,110 +14,97 @@ prev_error_y = 0
 
 url = 'http://192.168.10.132:8080/stream?topic=/main_camera/image_raw'
 
-def track_point(initial_point):
-    global integral_x, prev_error_x, integral_y, prev_error_y
-    
-    # Открываем веб-камеру
-    cap = cv2.VideoCapture(url)
+# Глобальные переменные для состояния трекера
+point_selected = False
+point = None
+tracker_initialized = False
+tracker = None
+processing_interval = 0.1  # интервал между обработкой кадров в секундах
+last_processed_time = 0
 
-    # Проверяем, открылась ли камера
-    if not cap.isOpened():
-        print("Ошибка открытия камеры")
-        return
+def fetch_image_from_stream(url):
+    img_resp = requests.get(url, stream=True)
+    if img_resp.status_code == 200:
+        img_bytes = bytes()
+        for chunk in img_resp.iter_content(chunk_size=1024):
+            img_bytes += chunk
+            a = img_bytes.find(b'\xff\xd8')
+            b = img_bytes.find(b'\xff\xd9')
+            if a != -1 and b != -1:
+                jpg = img_bytes[a:b+2]
+                img_bytes = img_bytes[b+2:]
+                img = cv2.imdecode(np.frombuffer(jpg, dtype=np.uint8), cv2.IMREAD_COLOR)
+                return img
+    else:
+        print("Failed to fetch image.")
+        return None
 
-    point_selected = False
+def initialize_tracker(initial_point):
+    global point, tracker_initialized, tracker
     point = initial_point
-    tracker_initialized = False
-    tracker = None
+    tracker = cv2.legacy.TrackerCSRT_create() if hasattr(cv2, 'legacy') else cv2.TrackerCSRT_create()
+    frame = fetch_image_from_stream(url)
+    if frame is None:
+        print("Ошибка получения кадра для инициализации трекера")
+        return False
+    bbox = (max(0, point[0] - 10), max(0, point[1] - 10), 20, 20)
+    tracker_initialized = tracker.init(frame, bbox)
+    return tracker_initialized
 
-    # Параметр для регулировки FPS
-    processing_interval = 0.3  # интервал между обработкой кадров в секундах
-    last_processed_time = 0
+def track_point_step():
+    global integral_x, prev_error_x, integral_y, prev_error_y, last_processed_time, point, tracker_initialized, tracker
 
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            print("Ошибка получения кадра")
-            break
-        print("Кадр получен")
+    frame = fetch_image_from_stream(url)
+    if frame is None:
+        print("Ошибка получения кадра")
+        return False
 
-        current_time = time.time()
-        if current_time - last_processed_time < processing_interval:
-            # Пропускаем обработку этого кадра
-            continue
+    current_time = time.time()
+    if current_time - last_processed_time < processing_interval:
+        return True  # Продолжаем работу
 
-        last_processed_time = current_time
+    last_processed_time = current_time
 
-        # Инициализация трекера
-        if not tracker_initialized:
-            tracker = cv2.legacy.TrackerCSRT_create() if hasattr(cv2, 'legacy') else cv2.TrackerCSRT_create()
-            bbox = (max(0, point[0] - 10), max(0, point[1] - 10), 20, 20)
-            tracker_initialized = tracker.init(frame, bbox)
-            if tracker_initialized:
-                print(f"Трекер инициализирован с bbox: {bbox}")
+    try:
+        center_x = point[0]
+        center_y = point[1]
+
+        error_x = center_x - frame.shape[1] // 2
+        error_y = center_y - frame.shape[0] // 2
+
+        integral_x += error_x
+        derivative_x = error_x - prev_error_x
+        prev_error_x = error_x
+        pid_output_x = Kp * error_x + Ki * integral_x + Kd * derivative_x
+
+        integral_y += error_y
+        derivative_y = error_y - prev_error_y
+        prev_error_y = error_y
+        pid_output_y = Kp * error_y + Ki * integral_y + Kd * derivative_y
+
+        # Отправка результатов PID-регулятора на другой адрес
+        payload = {'x': pid_output_x, 'y': pid_output_y}
+        response = requests.post('http://127.0.0.1:5000/post_pid_results', json=payload)
+        if response.status_code != 200:
+            print(f"Ошибка отправки результатов PID-регулятора: {response.text}")
+
+        # Обновляем трекер
+        if tracker_initialized:
+            success, bbox = tracker.update(frame)
+            if success:
+                point = (int(bbox[0] + bbox[2] / 2), int(bbox[1] + bbox[3] / 2))
+                payload = {'x': point[0], 'y': point[1]}
+                response = requests.post('http://127.0.0.1:5000/box_coords', json=payload)
+                cv2.rectangle(frame, (int(bbox[0]), int(bbox[1])), (int(bbox[0] + bbox[2]), int(bbox[1] + bbox[3])), (255, 0, 0), 2, 1)
             else:
-                print("Ошибка инициализации трекера")
-                tracker = None
+                cv2.putText(frame, "Tracking failure detected", (100, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255), 2)
 
-        try:
-            center_x = point[0]
-            center_y = point[1]
-            print(f"Центр: {center_x}, {center_y}")
+    except Exception as e:
+        print(f"Ошибка обработки кадра: {e}")
 
-            error_x = center_x - frame.shape[1] // 2
-            error_y = center_y - frame.shape[0] // 2
-            print(f"Ошибки: error_x = {error_x}, error_y = {error_y}")
+    cv2.imshow('Tracking', frame)
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        return False
 
-            integral_x += error_x
-            derivative_x = error_x - prev_error_x
-            prev_error_x = error_x
-            pid_output_x = Kp * error_x + Ki * integral_x + Kd * derivative_x
-            print(f"PID X: {pid_output_x}")
-
-            integral_y += error_y
-            derivative_y = error_y - prev_error_y
-            prev_error_y = error_y
-            pid_output_y = Kp * error_y + Ki * integral_y + Kd * derivative_y
-            print(f"PID Y: {pid_output_y}")
-
-            # Отправка результатов PID-регулятора на другой адрес
-            payload = {'x': pid_output_x, 'y': pid_output_y}
-            response = requests.post('http://127.0.0.1:5000/post_pid_results', json=payload)
-            print(f"Отправка PID результатов: {payload}")
-            if response.status_code != 200:
-                print(f"Ошибка отправки результатов PID-регулятора: {response.text}")
-
-            # Обновляем трекер
-            if tracker_initialized:
-                success, bbox = tracker.update(frame)
-                if success:
-                    point = (int(bbox[0] + bbox[2] / 2), int(bbox[1] + bbox[3] / 2))
-                    payload = {'x': point[0], 'y': point[1]}
-                    response = requests.post('http://127.0.0.1:5000/box_coords', json=payload)
-                    print(f"Отправка координат центра трекера: {payload}")
-                    # Рисуем bounding box вокруг трекаемой точки
-                    p1 = (int(bbox[0]), int(bbox[1]))
-                    p2 = (int(bbox[0] + bbox[2]), int(bbox[1] + bbox[3]))
-                    cv2.rectangle(frame, p1, p2, (255, 0, 0), 2, 1)
-                else:
-                    # В случае неудачи, отображаем текст ошибки
-                    cv2.putText(frame, "Tracking failure detected", (100, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255), 2)
-                    print("Ошибка отслеживания")
-
-        except Exception as e:
-            print(f"Ошибка обработки кадра: {e}")
-
-        # Отображаем кадр с аннотациями в окне OpenCV
-        cv2.imshow('Tracking', frame)
-
-        # Прерываем цикл по нажатию клавиши 'q'
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-
-    cap.release()
-    cv2.destroyAllWindows()
-
-# Пример вызова функции с начальной точкой
-# initial_point = (100, 100)
-# track_point(initial_point)
+    return True
 

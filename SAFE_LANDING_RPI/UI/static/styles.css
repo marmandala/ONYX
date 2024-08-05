@@ -13,6 +13,32 @@ h1 {
     color: #343a40;
 }
 
+button {
+    background-color: #4CAF50; /* Green */
+    border: none;
+    color: white;
+    padding: 15px 32px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+    margin: 20px 0;
+    cursor: pointer;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: background-color 0.3s ease, transform 0.3s ease;
+}
+
+button:hover {
+    background-color: #45a049;
+    transform: translateY(-2px);
+}
+
+button:active {
+    background-color: #3e8e41;
+    transform: translateY(0);
+}
+
 .video-container {
     position: relative;
     width: 80%;
@@ -34,8 +60,8 @@ img {
 
 #overlay-box {
     position: absolute;
-    width: 50px; /* Adjust box size as needed */
-    height: 50px;
+    width: 30px; /* Adjust box size as needed */
+    height: 30px;
     background-color: rgba(0, 0, 255, 0.3); /* Semi-transparent blue */
     border: 2px solid #007bff; /* Border color */
     box-sizing: border-box;

@@ -4,8 +4,13 @@ import requests
 import numpy as np
 from flask import jsonify
 import io
+import subprocess
 
 app = Flask(__name__)
+
+last_coordinates = None
+box_coordinates = None
+received_data = None
 
 # Переменные для хранения маски
 mask = None
@@ -62,6 +67,30 @@ def get_pid_results():
         return jsonify(received_data), 200
     else:
         return 'No data available', 404
+
+@app.route('/box_coords', methods=['POST'])
+def box_coords():
+    global last_coordinates
+    data = request.json  # Получаем JSON-данные из запроса
+    if 'x' in data and 'y' in data:
+        last_coordinates = f"{data['x']},{data['y']}"
+        return '', 204
+    else:
+        return 'Invalid data', 400
+
+@app.route('/box_coords', methods=['GET'])
+def get_box_coords():
+    if last_coordinates is not None:
+        x, y = last_coordinates.split(',')
+        return jsonify({'x': int(x), 'y': int(y)})
+    else:
+        return jsonify({'error': 'No coordinates available'}), 404
+
+@app.route('/safe_landing', methods=['POST'])
+def safe_landing():
+    print("SAFE LANDING")
+    subprocess.run(["python3", "/home/matvey/ONYX/SAFE_LANDING_COMPUTE_SERVER/main.py"])
+    return jsonify({"message": "Safe landing initiated"}), 200
 
 def get_frame():
     stream_url = "http://192.168.10.132:8080/stream?topic=/main_camera/image_raw"

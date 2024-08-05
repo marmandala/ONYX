@@ -4,12 +4,12 @@ import numpy as np
 from ultralytics import YOLO
 import time
 
-# Load the YOLO model
-model = YOLO('landing_zone_seg.pt')
+# Загрузка модели YOLO
+model = YOLO('/home/matvey/ONYX/SAFE_LANDING_COMPUTE_SERVER/landing_zone_seg.pt')
 
-# Stream URL
+# URL для потокового видео и отправки маски
 stream_url = "http://192.168.10.132:8080/stream?topic=/main_camera/image_raw"
-mask_endpoint = "http://192.168.10.132:5000/upload_mask"  # Replace with actual endpoint URL
+mask_endpoint = "http://192.168.10.132:5000/upload_mask"  # Замените на реальный URL
 
 def fetch_image_from_stream(url):
     img_resp = requests.get(url, stream=True)
@@ -31,15 +31,15 @@ def fetch_image_from_stream(url):
 def process_image(image):
     results = model(image, conf=0.7)
     
-    # Assuming single mask, take the first one
+    # Предполагая, что есть одна маска, берем первую
     mask = np.zeros(image.shape[:2], dtype=np.uint8)
     if results[0].masks is not None:
         mask = results[0].masks.data[0].cpu().numpy()
         mask = cv2.resize(mask, (image.shape[1], image.shape[0]))
         mask_colored = np.zeros_like(image)
-        mask_colored[mask == 1] = (0, 255, 0)  # Green color for mask
+        mask_colored[mask == 1] = (0, 255, 0)  # Зеленый цвет для маски
     else:
-        mask_colored = mask  # No mask, keep it black
+        mask_colored = mask  # Нет маски, оставляем черный
 
     return image, mask_colored
 
@@ -51,31 +51,21 @@ def send_mask(mask, endpoint):
     else:
         print(f"Failed to send mask. Status code: {response.status_code}")
 
-def main():
-    start_time = time.time()
+def compute_yolo_step():
+    image = fetch_image_from_stream(stream_url)
+    if image is None:
+        print(f"Error: Failed to load image from stream {stream_url}")
+        return False  # Индикатор остановки работы
 
-    while True:
-        elapsed_time = time.time() - start_time
-        print(f"Elapsed time: {elapsed_time:.2f} seconds")
-        
-        image = fetch_image_from_stream(stream_url)
-        if image is None:
-            print(f"Error: Failed to load image from stream {stream_url}")
-            break
-
-        processed_image, mask = process_image(image)
-        send_mask(mask, mask_endpoint)
-        
-        # Overlay the mask on the original image
-        overlay = cv2.addWeighted(processed_image, 0.7, mask, 0.3, 0)
-        
-        cv2.imshow('YOLOv8 Detection', overlay)
-        
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-
-    cv2.destroyAllWindows()
-
-if __name__ == "__main__":
-    main()
+    processed_image, mask = process_image(image)
+    send_mask(mask, mask_endpoint)
+    
+    # Наложение маски на оригинальное изображение
+    overlay = cv2.addWeighted(processed_image, 0.7, mask, 0.3, 0)
+    cv2.imshow('YOLOv8 Detection', overlay)
+    
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        return False  # Индикатор остановки работы
+    
+    return True  # Индикатор продолжения работы
 

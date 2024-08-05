@@ -29,7 +29,7 @@
             console.log(`Scaled coordinates (relative to original image): (${scaledX}, ${scaledY})`);
 
             var xhr = new XMLHttpRequest();
-            xhr.open("POST", "/publish_coordinates", true);
+            xhr.open("POST", "/box_coords", true);
             xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
             xhr.send("coordinates=" + scaledX + "," + scaledY);
         }
