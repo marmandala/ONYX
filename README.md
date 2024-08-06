@@ -1,7 +1,6 @@
 # ONYX PROJECT
 
-## Пример работы
-![Пример](screenshot_work.png)
+## Описание
 
 ## Схема работы
 ![Пример](scheme.jpg)
