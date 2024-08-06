@@ -4,4 +4,4 @@
 ![Пример](screenshot_work.png)
 
 ## Схема работы
-![Пример](scheme.png)
+![Пример](scheme.jpg)
